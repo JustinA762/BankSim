@@ -1,0 +1,87 @@
+package edu.temple.cis.c3238.banksim;
+
+/**
+ * @author Cay Horstmann
+ * @author Modified by Paul Wolfgang
+ * @author Modified by Charles Wang
+ * @author Modified by Alexa Delacenserie
+ * @author Modified by Tarek Elseify
+ */
+
+public class Bank {
+
+    public static final int NTEST = 10;
+    private final Account[] accounts;
+    private long numTransactions = 0;
+    private final int initialBalance;
+    private final int numAccounts;
+    private boolean open = true;
+
+    public Bank(int numAccounts, int initialBalance) {
+        this.initialBalance = initialBalance;
+        this.numAccounts = numAccounts;
+        accounts = new Account[numAccounts];
+        for (int i = 0; i < accounts.length; i++) {
+            accounts[i] = new Account(this, i, initialBalance);
+        }
+        numTransactions = 0;
+    }
+
+    public synchronized void transfer(int from, int to, int amount)
+    {
+        accounts[from].waitForSufficientFunds(amount);
+        if (!accounts[from].withdraw(amount))
+            return;
+        else
+            accounts[to].deposit(amount);
+
+        // Uncomment line when ready to start Task 3.
+        if (shouldTest()) test();
+    }
+
+    public void test()
+    {
+        int totalBalance = 0;
+        for (Account account : accounts) {
+            System.out.printf("%-30s %s%n",
+                    Thread.currentThread().toString(), account.toString());
+            totalBalance += account.getBalance();
+        }
+        System.out.printf("%-30s Total balance: %d\n", Thread.currentThread().toString(), totalBalance);
+        if (totalBalance != numAccounts * initialBalance) {
+            System.out.printf("%-30s Total balance changed!\n", Thread.currentThread().toString());
+            System.exit(0);
+        } else {
+            System.out.printf("%-30s Total balance unchanged.\n", Thread.currentThread().toString());
+        }
+        closeBank();
+    }
+
+    public int getNumAccounts() {
+        return numAccounts;
+    }
+
+    public boolean shouldTest() {
+        return ++numTransactions % NTEST == 0;
+    }
+
+    synchronized boolean isOpen()
+    {
+        return open;
+    }
+
+    void closeBank()
+    {
+        synchronized (this) {
+            open = false;
+        }
+        for (Account account: accounts)
+        {
+            synchronized (account)
+            {
+                account.notifyAll();
+            }
+        }
+    }
+
+}
